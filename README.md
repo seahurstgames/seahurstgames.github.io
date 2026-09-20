@@ -15,8 +15,14 @@ user-agent quirk can never silently run the wrong build.
 
 The `raw13g` host with its branding removed and the loading screen replaced.
 The jailbreak itself is untouched: `jb.js`, `core.js`, `mem.js`, `int64.js`,
-`ps4_offsets.js`, `rpc_worker.js`, `payload2.bin` and `patches/*.bin` are
-byte-for-byte identical to upstream (verified by SHA-256 on every build).
+`ps4_offsets.js`, `rpc_worker.js` and `patches/*.bin` are byte-for-byte
+identical to upstream (verified by SHA-256 on every build).
+
+The one deliberate change on top of upstream is the payload: `payload2.bin` is
+now **GoldHEN v2.4b18.11** (`goldhen.bin`, 13.52) instead of PS4-HEN. It is a
+flat position-independent blob beginning `e9 36 0e 00`, so it satisfies the
+loader's only gate (`payloadBlob[0] === 0xe9`) exactly like the old payload did;
+no JavaScript was changed.
 
 ## What changed
 
@@ -27,6 +33,7 @@ byte-for-byte identical to upstream (verified by SHA-256 on every build).
 | result screen | blank on success, "Restart your console" on failure | green `HEN LOADED SUCCESSFULLY` / red `HEN FAILED - RESTART YOUR CONSOLE` |
 | page title | `RAW GAME` | `PS4 HEN` |
 | `logo_raw.png` | shipped | removed (was only referenced by the manifest) |
+| payload | PS4-HEN | GoldHEN v2.4b18.11 (`payload2.bin`) |
 
 The status screen is **pure CSS — no JavaScript was added**. `jb.js` already
 publishes its outcome through `document.body.className` (`done` / `fail` /
@@ -56,7 +63,7 @@ index.html          landing / firmware gate / app-cache handling
 jb.html             status screen, imports jb.js
 jb.js               the exploit (upstream, unchanged)
 core.js mem.js int64.js ps4_offsets.js rpc_worker.js
-payload2.bin        PS4-HEN payload
+payload2.bin        GoldHEN v2.4b18.11 payload (13.52)
 patches/1302.bin patches/1350.bin patches/1352.bin
 cache.appcache      offline cache manifest, SHA-256 per file
 .nojekyll           serve files verbatim
