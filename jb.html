@@ -17,84 +17,101 @@
           system-ui,
           sans-serif;
       }
-      /* running: "PLEASE WAIT, ENABLING HEN" with accumulating dots.
-         jb.js only sets body.done / body.fail / body.log, so this is pure
-         CSS and the jailbreak code path is untouched. */
-      #status {
+      /* Status screen. jb.js only ever sets body.done / body.fail / body.log,
+         so every rule below is reactive CSS -- no JavaScript is added and the
+         jailbreak path is untouched.
+
+         The dots animate `transform`, not `opacity`, and that is on purpose:
+         the exploit owns the main thread for most of the run, and only a
+         composited transform keeps moving under that load. Opacity keyframes
+         freeze mid-cycle there, which reads as a static "...". */
+      #ui {
         position: fixed;
         top: 50%;
         left: 0;
         right: 0;
         transform: translateY(-50%);
         text-align: center;
+        padding: 0 24px;
+      }
+      #wait,
+      #ok,
+      #bad {
         font-size: 17px;
         font-weight: 600;
         letter-spacing: 0.1em;
+      }
+      #wait {
+        display: block;
         color: #e6ebf2;
       }
-      #status .d1,
-      #status .d2,
-      #status .d3 {
-        opacity: 0;
+      #dots {
+        color: #7fd0a0;
       }
-      #status .d1 {
+      /* one slot per dot, revealed left to right, so the line never reflows */
+      #dots span {
+        display: inline-block;
+      }
+      #dots .d1 {
         animation: dot1 1.6s infinite;
       }
-      #status .d2 {
+      #dots .d2 {
         animation: dot2 1.6s infinite;
       }
-      #status .d3 {
+      #dots .d3 {
         animation: dot3 1.6s infinite;
       }
-      /* one dot, two dots, three dots, then a blank beat */
       @keyframes dot1 {
         0%,
         74% {
-          opacity: 1;
+          transform: scale(1);
         }
         75%,
         100% {
-          opacity: 0;
+          transform: scale(0);
         }
       }
       @keyframes dot2 {
         0%,
         24% {
-          opacity: 0;
+          transform: scale(0);
         }
         25%,
         74% {
-          opacity: 1;
+          transform: scale(1);
         }
         75%,
         100% {
-          opacity: 0;
+          transform: scale(0);
         }
       }
       @keyframes dot3 {
         0%,
         49% {
-          opacity: 0;
+          transform: scale(0);
         }
         50%,
         74% {
-          opacity: 1;
+          transform: scale(1);
         }
         75%,
         100% {
-          opacity: 0;
+          transform: scale(0);
         }
       }
-      #msg {
-        position: fixed;
-        top: 50%;
-        left: 0;
-        right: 0;
-        transform: translateY(-50%);
-        text-align: center;
-        font-size: 16px;
-        letter-spacing: 0.5px;
+      #ok,
+      #bad {
         display: none;
+        font-size: 18px;
+        font-weight: 700;
+      }
+      #ok {
+        color: #7fd0a0;
+        text-shadow: 0 0 16px rgba(127, 208, 160, 0.45);
+      }
+      #bad {
+        color: #d08a7f;
+        text-shadow: 0 0 16px rgba(208, 138, 127, 0.45);
       }
       #wrap {
         padding: 0;
@@ -104,19 +121,19 @@
         display: none;
       }
 
-      body.done #status {
+      body.done #wait,
+      body.fail #wait {
         display: none;
       }
-      body.fail #status {
-        display: none;
+      body.done #ok {
+        display: block;
       }
-      body.fail #msg {
+      body.fail #bad {
         display: block;
       }
 
       /* ?log=1 -- the full step log, styled like the landing. */
-      body.log #status,
-      body.log #msg {
+      body.log #ui {
         display: none;
       }
       body.log #wrap {
@@ -162,10 +179,13 @@
     </style>
   </head>
   <body>
-    <!-- jb.js only sets body.done / body.fail / body.log, so the whole
-         status line below is pure CSS; the jailbreak path is untouched. -->
-    <div id="status">PLEASE WAIT, ENABLING HEN<span class="d1">.</span><span class="d2">.</span><span class="d3">.</span></div>
-    <div id="msg">Restart your console</div>
+    <!-- Status UI. jb.js publishes its outcome through document.body.className,
+         so this is pure CSS: nothing here can affect the exploit. -->
+    <div id="ui">
+      <div id="wait">PLEASE WAIT, ENABLING HEN<span id="dots"><span class="d1">.</span><span class="d2">.</span><span class="d3">.</span></span></div>
+      <div id="ok">HEN LOADED SUCCESSFULLY</div>
+      <div id="bad">HEN FAILED &mdash; RESTART YOUR CONSOLE</div>
+    </div>
     <div id="wrap">
       <div id="state"></div>
       <div id="out"></div>

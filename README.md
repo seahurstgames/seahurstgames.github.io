@@ -24,16 +24,24 @@ byte-for-byte identical to upstream (verified by SHA-256 on every build).
 |---|---|---|
 | branding | "RAW GAME" bar + logo | removed, no replacement |
 | loading screen | spinning ring | `PLEASE WAIT, ENABLING HEN` + cycling `. .. ...` |
+| result screen | blank on success, "Restart your console" on failure | green `HEN LOADED SUCCESSFULLY` / red `HEN FAILED - RESTART YOUR CONSOLE` |
 | page title | `RAW GAME` | `PS4 HEN` |
 | `logo_raw.png` | shipped | removed (was only referenced by the manifest) |
 
-The status line is pure CSS. `jb.js` never touches it — it only ever sets
-`body.done` / `body.fail` / `body.log`, and the stylesheet reacts to those, so
-none of the exploit code path was modified.
+The status screen is **pure CSS — no JavaScript was added**. `jb.js` already
+publishes its outcome through `document.body.className` (`done` / `fail` /
+`log`), so the stylesheet just reacts to that and the exploit code path is
+untouched.
 
-Note that the success and failure screens behave the same as upstream:
-`done` clears the screen (reboot to load HEN), `fail` shows
-"Restart your console". A failure means the payload thread never started.
+The dots animate `transform: scale()` rather than `opacity`, and that is
+deliberate. The exploit owns the main thread for most of the run, and only a
+composited transform keeps moving under that load — which is why the original
+spinner (a `transform: rotate()`) kept spinning while opacity keyframes freeze
+mid-cycle and read as a static `...`. Each dot keeps its own slot so the line
+never reflows, and with no animation support at all they simply stay visible.
+
+`done` means the payload thread started; `fail` means it did not, so the red
+screen is a real signal rather than decoration.
 
 ## Debug
 
