@@ -1,5 +1,1 @@
-# A static exploit host: git must not touch a single byte of these files.
-# `-text` disables EOL conversion; the loader hashes and byte-checks payloads.
 * -text
-*.bin binary
-*.png binary

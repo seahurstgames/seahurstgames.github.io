@@ -1,73 +1,71 @@
-# PS4 13.52 host - FTP from the base URL
+# PS4 jailbreak host — 13.02 / 13.04 / 13.50 / 13.52
 
-A copy of the [raw13g](https://github.com/raw13g/raw13g.github.io) PS4
-13.02 / 13.04 / 13.50 / 13.52 WebKit + kexec host.
+Load in the PS4 browser:
 
-## Use it
+```
+https://seahurstgames.github.io/
+```
 
-Open on the PS4 browser (clear the browser cache first):
+`index.html` reads the firmware from the user agent, checks the Application
+Cache, and forwards itself to `jb.html` automatically on a supported firmware.
+On anything else it shows a tap prompt instead of launching, so a
+user-agent quirk can never silently run the wrong build.
 
-    https://seahurstgames.github.io/
+## What this is
 
-That is the FTP-only build: PS4-HEN is disabled, and hippie68's FTP server is
-started instead. Then from a PC:
+The `raw13g` host with its branding removed and the loading screen replaced.
+The jailbreak itself is untouched: `jb.js`, `core.js`, `mem.js`, `int64.js`,
+`ps4_offsets.js`, `rpc_worker.js`, `payload2.bin` and `patches/*.bin` are
+byte-for-byte identical to upstream (verified by SHA-256 on every build).
 
-    curl -s --user anonymous: ftp://<PS4-IP>:1337/
+## What changed
 
-Default port is 1337.
+| | upstream | here |
+|---|---|---|
+| branding | "RAW GAME" bar + logo | removed, no replacement |
+| loading screen | spinning ring | `PLEASE WAIT, ENABLING HEN` + cycling `. .. ...` |
+| page title | `RAW GAME` | `PS4 HEN` |
+| `logo_raw.png` | shipped | removed (was only referenced by the manifest) |
 
-## What is loaded
+The status line is pure CSS. `jb.js` never touches it — it only ever sets
+`body.done` / `body.fail` / `body.log`, and the stylesheet reacts to those, so
+none of the exploit code path was modified.
 
-From `jb.js`:
+Note that the success and failure screens behave the same as upstream:
+`done` clears the screen (reboot to load HEN), `fail` shows
+"Restart your console". A failure means the payload thread never started.
 
-1. kernel patch, via kexec of `patches/1352.bin` in kernel mode;
-2. a payload fetched over HTTP, copied into anonymous RWX memory in the browser
-   process and started with libkernel `pthread_create`;
-3. the only gate on that blob is `payloadBlob[0] === 0xe9`, a flat
-   position-independent `jmp rel32`.
+## Debug
 
-An ELF such as `ftpsrv` can never work here - there is no ELF loader. That is
-what the upstream *"supports no other modules"* message refers to.
+- `?log=1` — full step-by-step log instead of the status screen
+- `?verbose=1` — don't truncate the log lines
+- `?force=1` — run even if the firmware isn't in the kernel table
 
-The old payload began `e9 91 49 00`; hippie68's server begins `e9 6b 53 00` -
-the same shape.
+## Files
 
-## Why it is started where it is
+```
+index.html          landing / firmware gate / app-cache handling
+jb.html             status screen, imports jb.js
+jb.js               the exploit (upstream, unchanged)
+core.js mem.js int64.js ps4_offsets.js rpc_worker.js
+payload2.bin        PS4-HEN payload
+patches/1302.bin patches/1350.bin patches/1352.bin
+cache.appcache      offline cache manifest, SHA-256 per file
+.nojekyll           serve files verbatim
+```
 
-`jb.js` warns about the window itself:
+## Rebuilding
 
-> `w1.td_ucred must equal the real ucred before this thread is torn down at
-> process exit (crfree runs on it)`
+`../build_site.py` regenerates this directory from a pristine `../upstream/`
+copy: it removes the branding, swaps the loading screen, and recomputes every
+`cache.appcache` hash. Each edit is asserted, so drift fails the build instead
+of shipping quietly.
 
-Before that repair, `td_ucred` points at a credential the process does not hold.
-A thread started there that faults makes `crfree` run on freed memory: refcount
-corruption, kernel panic, dead power button.
+## Rollback
 
-This build starts the FTP thread **after** the repair (`JB-TDUCRED` at 3134,
-`PAYLOAD2-RUN` at 3200) with PS4-HEN disabled (`if (false)` at 3054). A fault
-costs the browser process, not the console.
+Every file is byte-identical to upstream except `index.html`, `jb.html` and
+`cache.appcache` (plus the two dotfiles). To go back, restore those three from
+`raw13g.github.io` and drop `.nojekyll` / `.gitattributes`.
 
-One honest trade-off: the repair resets `td_ucred`, so the FTP server may not
-inherit the credentials needed to reach `/system_data/priv/`. If FTP comes up but
-cannot see that path, credential timing is the next problem, and it is solvable.
-
-## Other builds
-
-| path | loads |
-|------|-------|
-| `/` | FTP only, started after the repair |
-| `/chain/` | PS4-HEN **and** FTP, both safe-window |
-| `/baseline/` | untouched upstream |
-
-## Recovering a hung console
-
-Hold the power button ~15 s; if that fails, cut power. Nothing here writes to
-flash - the exploit only patches RAM - so a power cycle recovers it. The next
-boot may run a filesystem check; let it finish. Reboot before any second attempt,
-or a tainted heap makes every later run fail the same way.
-
-## Credits
-
-- WebKit + kexec host, PS4-HEN, kernel patches: **raw13g**
-- FTP payload: **hippie68/ps4-ftp** v1.08b
-- ftpsrv (not usable here; it is an ELF): **drakmor**, **ps5-payload-dev**
+If the PS4 browser serves you a stale build, clear its browser data — the
+Application Cache is per-origin.
