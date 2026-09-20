@@ -1,82 +1,71 @@
-# RAW GAME — PS4 13.52 host with a chained FTP payload
+# PS4 13.52 host — three builds
 
 A copy of the [raw13g](https://github.com/raw13g/raw13g.github.io) PS4
-13.02 / 13.04 / 13.50 / 13.52 WebKit + kexec jailbreak host, with one addition:
-after the bundled PS4-HEN payload starts, a second native payload (`ftp.bin`)
-is started the same way, which gives you an FTP server on the console.
+13.02 / 13.04 / 13.50 / 13.52 WebKit + kexec host, plus two attempts at getting
+an FTP server onto the console.
 
-## Use it
+| path | what it is | status |
+|------|------------|--------|
+| `/` | upstream, untouched | known good on this console |
+| `/ftp/` | upstream code, payload slot repointed at an FTP server | **try this** |
+| `/chain/` | HEN **and** FTP as two threads | **froze the console — do not use** |
 
-Open this on the PS4 browser:
+## `/ftp/` — why this one is different
+
+It changes **no JavaScript**. `ps4_offsets.js` already reads
+`payload: "payload2.bin"`, so `/ftp/` just puts the FTP server at that filename.
+Everything the exploit actually executes is byte-for-byte the build that already
+works on the console; the only difference is which bytes get mapped and started.
+
+What the file is, and why it fits:
+
+- `jb.js` maps the payload into anonymous RWX memory in the browser process and
+  starts it with libkernel `pthread_create`. Its only check is
+  `payloadBlob[0] === 0xe9`.
+- The old PS4-HEN blob began `e9 91 49 00`; hippie68's FTP server begins
+  `e9 6b 53 00` — the same flat position-independent `jmp rel32` shape.
+- hippie68's own README says the payload is safe to stop with "close the
+  browser", i.e. it is explicitly meant to be run inside the browser process.
+
+An ELF such as ftpsrv can never work here: there is no ELF loader, which is what
+the upstream "supports no other modules" message refers to.
+
+## What `/chain/` did
+
+It started FTP as a *second* thread after PS4-HEN and added an `await fetch()`
+in the middle of the exploit's teardown — after the kernel patch and payload
+start, but before `td_ucred` is restored. That build hung the console. Do not
+use it. If you want a combined build later, it has to be built without
+perturbing the exploit's flow, and that is a separate piece of work.
+
+## Testing `/ftp/`
+
+Open on the PS4 browser, with the browser cache cleared first:
 
 ```
-https://<USERNAME>.github.io/<REPO>/jb.html?payload=1
+https://seahurstgames.github.io/ftp/jb.html
 ```
 
-Watch the on-screen console for:
-
-```
-KEXEC syscall(661)=0
-PAYLOAD-RUN pthread_create=0 handle=...
-PAYLOAD2-BLOB ftp.bin len=37824 e9=1
-PAYLOAD2-RUN ftp.bin pthread_create=0
-```
-
-then from a PC:
+Then from the PC:
 
 ```
 curl -s --user anonymous: ftp://<PS4-IP>:1337/
 ```
 
-`?payload=0` disables the whole payload stage; `?payload2=other.bin` picks a
-different second payload.
+hippie68's server defaults to **port 1337**.
 
-## Why a second payload works
+If the console hangs instead, that tells us something useful: the FTP blob
+cannot run in that process at that address, and the next step is a payload that
+is definitely position-independent rather than more attempt-and-reboot.
 
-`jb.js` runs the payload slot named in `ps4_offsets.js`
-(`payload: "payload2.bin"`, PS4-HEN) by mapping the file into anonymous RWX
-memory **in the browser process** and starting it with libkernel's
-`pthread_create`. The only check it makes on that blob is:
+## Recovering a hung console
 
-```js
-payloadBlob[0] === 0xe9        // a flat position-independent `jmp rel32`
-```
-
-`ftp.bin` (hippie68/ps4-ftp v1.08b) begins `e9 6b 53 00`, so it satisfies the
-same check and is started as a second userland thread. The kernel patch
-(`patches/1352.bin`) is a separate kexec step and is untouched.
-
-This is also why an ELF such as ftpsrv cannot be used here: there is no ELF
-loader in this host. That is what the upstream "supports no other modules"
-message means.
-
-## Enabling GitHub Pages
-
-Settings → Pages → Source: **Deploy from a branch** → `main` / `(root)`.
-Both site layouts work, because every path here is relative:
-
-| repo | URL |
-|------|-----|
-| `USERNAME.github.io` | `https://USERNAME.github.io/jb.html?payload=1` |
-| any other repo | `https://USERNAME.github.io/<repo>/jb.html?payload=1` |
-
-## Troubleshooting
-
-- `PAYLOAD2-BLOB ... e9=0` or `PAYLOAD2-FETCH-FAIL` — the browser served a
-  cached copy, or `ftp.bin` 404s. Open
-  `https://<USERNAME>.github.io/<REPO>/ftp.bin` in a normal browser; it should
-  download 37 KB starting `e9 6b 53 00`.
-- `PAYLOAD2-RUNNING` never appears — the blob may not be position-independent
-  enough for an arbitrary mmap address. Test it on its own with the swap build.
-- Application Cache is per-origin, so a fresh origin starts clean; bump the
-  `# rev` line in `cache.appcache` whenever a cached file changes, or the
-  console will keep serving the old one.
+Hold the power button ~15 s; if that fails, cut power. Nothing here writes to
+flash — the exploit only patches RAM — so a power cycle recovers the console.
+Note that when it hangs, the PS4 may spend a moment checking the filesystem.
 
 ## Credits
 
-- WebKit + kexec host, PS4-HEN payload, kernel patches: **raw13g**
-- `ftp.bin`: **hippie68/ps4-ftp** v1.08b — default port 1337
+- WebKit + kexec host, PS4-HEN, kernel patches: **raw13g**
+- FTP payload: **hippie68/ps4-ftp** v1.08b
 - ftpsrv (not usable here; it is an ELF): **drakmor**, **ps5-payload-dev**
-
-The upstream host ships no licence. This is a republished copy with one patch,
-so keep the credit to `raw13g` if you leave it public.
