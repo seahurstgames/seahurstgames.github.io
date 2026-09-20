@@ -29,9 +29,9 @@ no JavaScript was changed.
 | | upstream | here |
 |---|---|---|
 | branding | "RAW GAME" bar + logo | removed, no replacement |
-| loading screen | spinning ring | `PLEASE WAIT, ENABLING HEN` + cycling `. .. ...` |
-| result screen | blank on success, "Restart your console" on failure | green `HEN LOADED SUCCESSFULLY` / red `HEN FAILED - RESTART YOUR CONSOLE` |
-| page title | `RAW GAME` | `PS4 HEN` |
+| loading screen | spinning ring | `PLEASE WAIT, ENABLING GOLDHEN` + cycling `. .. ...` |
+| result screen | blank on success, "Restart your console" on failure | green `GOLDHEN LOADED SUCCESSFULLY` / red `GOLDHEN FAILED - RESTART YOUR CONSOLE` |
+| page title | `RAW GAME` | `PS4 GOLDHEN` |
 | `logo_raw.png` | shipped | removed (was only referenced by the manifest) |
 | payload | PS4-HEN | GoldHEN v2.4b18.11 (`payload2.bin`) |
 
