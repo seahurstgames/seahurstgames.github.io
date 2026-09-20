@@ -3153,21 +3153,6 @@ let allDone = false,
               mark("JB-TDUCRED-THREW", (e6 && e6.message) || String(e6));
             }
 
-            if (jbRestoreHook && !KEEP_JB) jbRestoreHook("end-of-run");
-            else if (jbRestoreHook) {
-              mark(
-                "JB-KEEP",
-                "?keepjb=1 -- jailbreak left LIVE. The handles will" +
-                  " be restored on pagehide; if the browser is killed instead," +
-                  " REBOOT rather than closing it.",
-              );
-              window.addEventListener("pagehide", function () {
-                try {
-                  jbRestoreHook("pagehide");
-                } catch (e) {}
-              });
-            }
-
             if (DO_PAYLOAD && PAYLOAD2_FILE && payload2Blob && payload2Blob[0] === 0xe9) {
               try {
                 const sz2 = (payload2Blob.length + 0x3fff) & ~0x3fff;
@@ -3204,6 +3189,21 @@ let allDone = false,
               } catch (e8) {
                 mark("PAYLOAD2-THREW", (e8 && e8.message) || String(e8));
               }
+            }
+
+            if (jbRestoreHook && !KEEP_JB) jbRestoreHook("end-of-run");
+            else if (jbRestoreHook) {
+              mark(
+                "JB-KEEP",
+                "?keepjb=1 -- jailbreak left LIVE. The handles will" +
+                  " be restored on pagehide; if the browser is killed instead," +
+                  " REBOOT rather than closing it.",
+              );
+              window.addEventListener("pagehide", function () {
+                try {
+                  jbRestoreHook("pagehide");
+                } catch (e) {}
+              });
             }
 
             mark(
