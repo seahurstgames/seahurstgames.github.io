@@ -156,7 +156,7 @@ let allDone = false,
     const DO_PATCH = params.get("patch") !== "0";
     const DO_PAYLOAD = params.get("payload") !== "0";
 
-    const KEEP_JB = params.get("keepjb") === "1";
+    const KEEP_JB = params.get("keepjb") !== "0"; // keep jailbreak live so the FTP thread keeps rdir/jdir
 
     const NEED_K = [
       "k_idt_rsvd",
